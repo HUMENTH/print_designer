@@ -56,6 +56,21 @@
 								}, 300)
 							"
 						/>
+						<div class="hidden-toggle">
+							<label class="switch">
+								<input type="checkbox" :class="{ checked: hiddenFields }" :checked="hiddenFields"
+									@change="() => {
+										hiddenFields = !hiddenFields;
+									}"
+									@click="MainStore.isHiddenFieldsVisible = !MainStore.isHiddenFieldsVisible;"
+									>
+								<span class="slider round"></span>
+							</label>
+							<span>Hidden Fields</span>
+						</div>
+					</div>
+					<div class="form-message yellow" v-if="hiddenFields">
+						<div>Fields with <b>Print Hide</b> are now also visible and can be printed. please be careful while selecting fields </div>
 					</div>
 					<div class="container-main">
 						<div
@@ -63,6 +78,7 @@
 								selectedParentField: previewRef?.parentField,
 								selectedTable: table,
 								search_string: search_text,
+								show_hidden_fields: hiddenFields,
 							})"
 							:key="fieldtype"
 						>
@@ -89,7 +105,12 @@
 									>
 										<div class="field-label">
 											<span>{{ field.label || field.fieldname }}</span>
-											<span class="fa fa-check-circle icon-show"></span>
+											<IconsUse
+												name="es-line-check"
+												key="es-line-check"
+												class="icon-show"
+												color="var(--primary)"
+											/>
 										</div>
 									</div>
 								</div>
@@ -114,6 +135,7 @@ import { ref, onMounted, watch, nextTick } from "vue";
 import { getMeta, getValue } from "../../store/fetchMetaAndData";
 import { useMainStore } from "../../store/MainStore";
 import AppModal from "./AppModal.vue";
+import IconsUse from "../../icons/IconsUse.vue";
 import AppDynamicPreviewModal from "./AppDynamicPreviewModal.vue";
 const MainStore = useMainStore();
 const props = defineProps({
@@ -131,7 +153,27 @@ const search_text = ref("");
 const doctype = ref("");
 const selectedDoctypeLabel = ref("");
 const fieldnames = ref([]);
+const hiddenFields = ref(false);
 const previewRef = ref(null);
+
+const allowHiddenFieldDisable = watch(
+	() => hiddenFields.value,
+	(newValue, oldValue) => {
+		if (newValue == false && oldValue == true) {
+			let hidden_fields = fieldnames.value.filter((el) => el.print_hide).map((el) => el.label || el.fieldname);
+			if (!hidden_fields.length) return;
+			hiddenFields.value = true;
+			message = __("Please First remove hidden fields [ " + [...hidden_fields].join(", ") + " ]");
+			frappe.show_alert(
+				{
+					message: message,
+					indicator: "red",
+				},
+				5
+			);
+		}
+	}
+);
 
 const parentFieldWatcher = watch(
 	() => previewRef.value?.parentField,
@@ -162,6 +204,10 @@ onMounted(() => {
 		selectedDoctypeLabel.value = MainStore.doctype;
 		if (props.table) {
 			fieldnames.value = props.openDynamicModal.dynamicContent || [];
+		}
+		fieldnames.value.findIndex((fd) => fd.print_hide) != -1 && (hiddenFields.value = true);
+		if (!hiddenFields.value) {
+			hiddenFields.value = MainStore.isHiddenFieldsVisible
 		}
 	}
 });
@@ -212,7 +258,7 @@ const selectField = async (field, fieldtype) => {
 	let value = previewRef.value.parentField
 					? await getValue(doctype.value, MainStore.docData[previewRef.value.parentField], field.fieldname)
 					: props.table
-					? typeof MainStore.docData[props.table.fieldname]?.[0][field.fieldname] != "undefined" ? frappe.format(
+					? MainStore.docData[props.table.fieldname]?.length && typeof MainStore.docData[props.table.fieldname][0][field.fieldname] != "undefined" ? frappe.format(
 							MainStore.docData[props.table.fieldname][0][field.fieldname],
 							{ fieldtype: field.fieldtype, options: field.options },
 							{ inline: true },
@@ -258,6 +304,7 @@ const selectField = async (field, fieldtype) => {
 		label: props.table ? field.label : `${field.label} :`,
 		is_labelled: false,
 		is_static: false,
+		print_hide: field.print_hide,
 		style: {},
 		tableName: props.table?.fieldname,
 		labelStyle: {},
@@ -312,7 +359,7 @@ const cancelClick = () => {
 		}
 	});
 	fieldnames.value.forEach((element) => {
-		if (props.openDynamicModal.dynamicContent.indexOf(element) == -1) {
+		if (props.openDynamicModal.dynamicContent?.indexOf(element) == -1) {
 			MainStore.dynamicData.splice(MainStore.dynamicData.indexOf(element), 1);
 		}
 	});
@@ -349,7 +396,7 @@ small {
 		}
 	}
 	.side-section {
-		background-color: var(--bg-color);
+		background-color: var(--subtle-accent);
 		overflow: hidden;
 		min-width: 16%;
 		max-width: 16%;
@@ -379,7 +426,7 @@ small {
 			}
 			&::-webkit-scrollbar-track,
 			&::-webkit-scrollbar-corner {
-				background: var(--bg-color);
+				background: var(--subtle-fg);
 			}
 			&::-webkit-scrollbar-thumb {
 				background: var(--gray-300);
@@ -438,11 +485,34 @@ small {
 			border-radius: 6px;
 		}
 		.searchbar-sticky {
+			display: flex;
 			margin-bottom: 0;
 			position: sticky;
 			top: 0;
 			z-index: 1;
 			background-color: var(--fg-color);
+
+			.searchbar {
+				flex: 5;
+			}
+
+			.hidden-toggle {
+				display: flex;
+				gap: 5px;
+				padding: var(--padding-sm);
+
+				.switch > .checked {
+					& + .slider {
+						background-color: var(--invert-neutral);
+					}
+
+					& + .slider:before {
+						-webkit-transform: translateX(10px);
+						-ms-transform: translateX(10px);
+						transform: translateX(10px);
+					}
+				}
+			}
 		}
 		.container-main {
 			padding: var(--padding-sm) 15px 0px var(--padding-sm);
@@ -473,14 +543,15 @@ small {
 						align-items: center;
 						padding: 8px 0;
 						margin: 0px 8px;
-						color: var(--text-light);
+						color: var(--text-muted);
+						cursor: pointer;
 						.field-label {
 							padding: 0px 15px;
 							flex: 0 0 100%;
 							max-width: 100%;
 						}
 						&:hover {
-							border: 1px solid var(--success);
+							border: 1px solid var(--gray-600);
 							padding: 7px 0px;
 							border-radius: var(--border-radius);
 							.field-label {
@@ -494,12 +565,14 @@ small {
 						display: none;
 					}
 					.field-selected {
-						border: 1px solid var(--success);
+						&, &:hover {
+							border: 1px solid var(--primary);
+						}
 						padding: 7px 0px;
 						border-radius: var(--border-radius);
 						.icon-show {
 							display: unset;
-							color: var(--success);
+							color: var(--primary);
 						}
 						.field-label {
 							font-weight: 600;

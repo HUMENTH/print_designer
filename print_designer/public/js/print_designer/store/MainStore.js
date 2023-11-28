@@ -18,7 +18,7 @@ export const useMainStore = defineStore("MainStore", {
 		 * @type {'editing'|'pdfSetup'|'preview'} mode
 		 */
 		mode: "editing",
-		cursor: "default",
+		cursor: "cursor: url('/assets/print_designer/images/mouse-pointer.svg'), default !important",
 		isMarqueeActive: false,
 		isDrawing: false,
 		doctype: null,
@@ -58,6 +58,7 @@ export const useMainStore = defineStore("MainStore", {
 		lastCloned: null,
 		currentDrawListener: null,
 		isMoved: false,
+		isHiddenFieldsVisible: false,
 		currentPageSize: "A4",
 		pageSizes,
 		lastCreatedElement: null,
@@ -86,43 +87,43 @@ export const useMainStore = defineStore("MainStore", {
 		},
 		controls: {
 			MousePointer: {
-				icon: "fa fa-mouse-pointer",
+				icon: "mouseTool",
 				control: "MousePointer",
 				aria_label: __("Mouse Pointer (M)"),
 				id: "mouse-pointer",
-				cursor: "default",
+				cursor:  "url('/assets/print_designer/images/mouse-pointer.svg'), default",
 				isDisabled: false,
 			},
 			Text: {
-				icon: "fa fa-font",
+				icon: "textTool",
 				control: "Text",
 				aria_label: __("Text (T)"),
 				id: "text",
-				cursor: "text",
+				cursor:  "url('/assets/print_designer/images/add-text.svg') 10 10, text",
 				isDisabled: false,
 			},
 			Rectangle: {
-				icon: "fa fa-square-o",
+				icon: "rectangleTool",
 				control: "Rectangle",
 				aria_label: __("Rectangle (R)"),
 				id: "rectangle",
-				cursor: "crosshair",
+				cursor:  "url('/assets/print_designer/images/add-rectangle.svg') 6 6, crosshair",
 				isDisabled: false,
 			},
 			Image: {
-				icon: "fa fa-image",
+				icon: "imageTool",
 				control: "Image",
 				aria_label: __("Image (I)"),
 				id: "image",
-				cursor: "crosshair",
+				cursor:  "url('/assets/print_designer/images/add-image.svg') 6 6, crosshair",
 				isDisabled: false,
 			},
 			Table: {
-				icon: "fa fa-table",
+				icon: "tableTool",
 				control: "Table",
 				aria_label: __("Table (A)"),
 				id: "table",
-				cursor: "crosshair",
+				cursor:  "url('/assets/print_designer/images/add-table.svg') 6 6, crosshair",
 				isDisabled: false,
 			},
 			// Components: {
@@ -133,11 +134,11 @@ export const useMainStore = defineStore("MainStore", {
 			// 	cursor: "default",
 			// },
 			Barcode: {
-				icon: "fa fa-barcode",
+				icon: "barcodeTool",
 				control: "Barcode",
 				aria_label: __("Barcode (B)"),
 				id: "barcode",
-				cursor: "crosshair",
+				cursor:  "url('/assets/print_designer/images/add-barcode.svg') 6 6, crosshair",
 			},
 		},
 		propertiesPanel: [],
@@ -231,6 +232,7 @@ export const useMainStore = defineStore("MainStore", {
 				selectedParentField = null,
 				selectedTable = null,
 				search_string = null,
+				show_hidden_fields = false,
 			}) => {
 				let fields = {};
 				let metaFields = state.metaFields;
@@ -240,6 +242,9 @@ export const useMainStore = defineStore("MainStore", {
 					).childfields;
 				} else if (selectedTable) {
 					metaFields = selectedTable.childfields;
+				}
+				if (!show_hidden_fields){
+					metaFields = metaFields.filter((field) => !field["print_hide"]);
 				}
 				if (typeof search_string == "string" && search_string.length) {
 					metaFields = metaFields.filter(
@@ -265,10 +270,9 @@ export const useMainStore = defineStore("MainStore", {
 						];
 					}
 				} else if (
-					!selectedParentField &&
-					(typeof search_string != "string" ||
-						!search_string.length ||
-						"Name".toLowerCase().includes(search_string.toLowerCase()))
+					typeof search_string != "string" ||
+					!search_string.length ||
+					"Name".toLowerCase().includes(search_string.toLowerCase())
 				) {
 					fields["Document"] = [
 						{
@@ -277,31 +281,35 @@ export const useMainStore = defineStore("MainStore", {
 							label: "Name",
 							options: undefined,
 						},
-						{
-							fieldname: "page",
-							fieldtype: "Small Text",
-							label: "Current Page",
-							options: undefined,
-						},
-						{
-							fieldname: "topage",
-							fieldtype: "Small Text",
-							label: "Total Pages",
-							options: undefined,
-						},
-						{
-							fieldname: "time",
-							fieldtype: "Small Text",
-							label: "Print Time",
-							options: undefined,
-						},
-						{
-							fieldname: "date",
-							fieldtype: "Small Text",
-							label: "Print Date",
-							options: undefined,
-						},
 					];
+					if (!selectedParentField) {
+						fields["Document"].push(
+							{
+								fieldname: "page",
+								fieldtype: "Small Text",
+								label: "Current Page",
+								options: undefined,
+							},
+							{
+								fieldname: "topage",
+								fieldtype: "Small Text",
+								label: "Total Pages",
+								options: undefined,
+							},
+							{
+								fieldname: "time",
+								fieldtype: "Small Text",
+								label: "Print Time",
+								options: undefined,
+							},
+							{
+								fieldname: "date",
+								fieldtype: "Small Text",
+								label: "Print Date",
+								options: undefined,
+							}
+						);
+					}
 				}
 				metaFields.forEach((field) => {
 					if (
